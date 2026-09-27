@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Journal Pro Clone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #0b0e14; color: #e1e7ef; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { background-color: #151a24; border: 1px solid #232a3b; border-radius: 8px; }
+        .input-field { background-color: #1c2333; border: 1px solid #2d374d; color: #fff; padding: 8px 12px; border-radius: 6px; width: 100%; }
+        .input-field:focus { outline: none; border-color: #3b82f6; }
+        .btn-primary { background-color: #2563eb; color: #fff; padding: 8px 16px; border-radius: 6px; font-weight: 600; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+    </style>
+</head>
+<body class="p-6">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                📊 Trading Journal Pro
+            </h1>
+            <p class="text-xs text-gray-400 mt-1">100% Private. Local Browser Data.</p>
+        </div>
+        <div class="flex gap-4 text-sm">
+            <div class="card px-4 py-2">
+                <span class="text-gray-400 block text-xs">Today's P&L</span>
+                <span id="stat-pnl" class="text-green-400 font-bold text-lg">+$0.00</span>
+            </div>
+            <div class="card px-4 py-2">
+                <span class="text-gray-400 block text-xs">Win Rate</span>
+                <span id="stat-winrate" class="text-blue-400 font-bold text-lg">0%</span>
+            </div>
+            <div class="card px-4 py-2">
+                <span class="text-gray-400 block text-xs">Profit Factor</span>
+                <span id="stat-pf" class="text-purple-400 font-bold text-lg">0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Left Column: Risk Calculator & Setup Score -->
+        <div class="space-y-6">
+            <!-- Position Sizer -->
+            <div class="card p-5">
+                <h2 class="text-lg font-bold mb-4 text-blue-400">🧮 Risk-Based Position Sizing</h2>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <label class="block text-gray-400 mb-1">Account Equity ($)</label>
+                        <input type="number" id="calc-equity" value="20000" class="input-field" oninput="calculateRisk()">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 mb-1">Risk (%)</label>
+                            <input type="number" id="calc-risk" value="1" step="0.1" class="input-field" oninput="calculateRisk()">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 mb-1">Risk Amount ($)</label>
+                            <input type="text" id="calc-risk-val" readonly class="input-field bg-gray-800 text-gray-400" value="$200.00">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 mb-1">Entry Price ($)</label>
+                            <input type="number" id="calc-entry" value="100" class="input-field" oninput="calculateRisk()">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 mb-1">Stop Loss ($)</label>
+                            <input type="number" id="calc-stop" value="95" class="input-field" oninput="calculateRisk()">
+                        </div>
+                    </div>
+                    <div class="p-3 bg-blue-950/40 border border-blue-800/50 rounded-lg text-center mt-4">
+                        <span class="text-xs text-gray-400 block">Suggested Position Size</span>
+                        <span id="calc-result" class="text-xl font-bold text-green-400">40 Shares</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Setup Score Evaluator -->
+            <div class="card p-5">
+                <h2 class="text-lg font-bold mb-4 text-yellow-400">🎯 Setup Score Calculator</h2>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="score-trend" class="w-4 h-4" onchange="calculateScore()"> HTF Trend Aligned (+30)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="score-rr" class="w-4 h-4" onchange="calculateScore()"> Risk/Reward >= 1:2 (+30)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="score-level" class="w-4 h-4" onchange="calculateScore()"> At Key Support/Resistance (+20)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="score-rsi" class="w-4 h-4" onchange="calculateScore()"> RSI / Volume Confluence (+20)
+                    </label>
+                    <div class="mt-4 flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                        <span class="text-xs text-gray-400">Score Rating:</span>
+                        <span id="score-display" class="font-bold text-lg text-gray-400">0 / 100</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Trade Log & Chart -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Add Trade Form -->
+            <div class="card p-5">
+                <h2 class="text-lg font-bold mb-4 text-green-400">➕ Log New Trade</h2>
+                <form id="trade-form" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm" onsubmit="addTrade(event)">
+                    <div>
+                        <label class="block text-gray-400 mb-1">Symbol</label>
+                        <input type="text" id="t-symbol" required placeholder="z.B. NVDA" class="input-field uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 mb-1">Side</label>
+                        <select id="t-side" class="input-field">
+                            <option value="LONG">LONG</option>
+                            <option value="SHORT">SHORT</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 mb-1">Realized P&L ($)</label>
+                        <input type="number" id="t-pnl" required step="0.01" placeholder="150.00" class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 mb-1">Setup Type</label>
+                        <input type="text" id="t-setup" placeholder="Breakout" class="input-field">
+                    </div>
+                    <div class="md:col-span-4 flex justify-end mt-2">
+                        <button type="submit" class="btn-primary">Trade Speichern</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Equity Curve Chart -->
+            <div class="card p-5">
+                <h2 class="text-lg font-bold mb-4 text-purple-400">📈 Equity Curve</h2>
+                <div class="h-48">
+                    <canvas id="equityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Trades Table -->
+            <div class="card p-5">
+                <h2 class="text-lg font-bold mb-4 text-gray-200">📝 Trade History</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-xs text-gray-400 border-b border-gray-800">
+                            <tr>
+                                <th class="pb-2">Datum</th>
+                                <th class="pb-2">Symbol</th>
+                                <th class="pb-2">Side</th>
+                                <th class="pb-2">Setup</th>
+                                <th class="pb-2 text-right">P&L ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trade-table-body" class="divide-y divide-gray-800">
+                            <!-- Dynamisch via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let trades = JSON.parse(localStorage.getItem('journal_trades')) || [
+            { date: '2026-05-22', symbol: 'NVDA', side: 'LONG', setup: 'Breakout', pnl: 955.00 },
+            { date: '2026-05-23', symbol: 'TSLA', side: 'SHORT', setup: 'Reversal', pnl: -220.00 },
+            { date: '2026-05-24', symbol: 'AAPL', side: 'LONG', setup: 'Pullback', pnl: 153.60 }
+        ];
+
+        let chart;
+
+        function initChart() {
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Account Equity ($)',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' } }
+                    }
+                }
+            });
+            updateDashboard();
+        }
+
+        function calculateRisk() {
+            const equity = parseFloat(document.getElementById('calc-equity').value) || 0;
+            const riskPct = parseFloat(document.getElementById('calc-risk').value) || 0;
+            const entry = parseFloat(document.getElementById('calc-entry').value) || 0;
+            const stop = parseFloat(document.getElementById('calc-stop').value) || 0;
+
+            const riskAmount = equity * (riskPct / 100);
+            document.getElementById('calc-risk-val').value = `$${riskAmount.toFixed(2)}`;
+
+            const stopDist = Math.abs(entry - stop);
+            if (stopDist > 0) {
+                const qty = Math.floor(riskAmount / stopDist);
+                document.getElementById('calc-result').innerText = `${qty} Shares / Stk.`;
+            } else {
+                document.getElementById('calc-result').innerText = '0 Shares';
+            }
+        }
+
+        function calculateScore() {
+            let score = 0;
+            if (document.getElementById('score-trend').checked) score += 30;
+            if (document.getElementById('score-rr').checked) score += 30;
+            if (document.getElementById('score-level').checked) score += 20;
+            if (document.getElementById('score-rsi').checked) score += 20;
+
+            const display = document.getElementById('score-display');
+            display.innerText = `${score} / 100`;
+            if (score >= 80) display.className = 'font-bold text-lg text-green-400';
+            else if (score >= 50) display.className = 'font-bold text-lg text-yellow-400';
+            else display.className = 'font-bold text-lg text-red-400';
+        }
+
+        function addTrade(e) {
+            e.preventDefault();
+            const symbol = document.getElementById('t-symbol').value.toUpperCase();
+            const side = document.getElementById('t-side').value;
+            const pnl = parseFloat(document.getElementById('t-pnl').value);
+            const setup = document.getElementById('t-setup').value || 'N/A';
+            const date = new Date().toISOString().split('T')[0];
+
+            trades.push({ date, symbol, side, setup, pnl });
+            localStorage.setItem('journal_trades', JSON.stringify(trades));
+            
+            document.getElementById('trade-form').reset();
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            const tableBody = document.getElementById('trade-table-body');
+            tableBody.innerHTML = '';
+            
+            let cumPnL = 20000;
+            let chartLabels = ['Start'];
+            let chartData = [20000];
+            let wins = 0;
+            let totalProfit = 0;
+            let totalLoss = 0;
+            let todayPnL = 0;
+
+            trades.forEach((t) => {
+                const row = document.createElement('tr');
+                const pnlClass = t.pnl >= 0 ? 'text-green-400' : 'text-red-400';
+                
+                row.innerHTML = `
+                    <td class="py-2 text-gray-400">${t.date}</td>
+                    <td class="py-2 font-bold">${t.symbol}</td>
+                    <td class="py-2"><span class="px-2 py-0.5 rounded text-xs ${t.side === 'LONG' ? 'bg-green-950 text-green-400' : 'bg-red-950 text-red-400'}">${t.side}</span></td>
+                    <td class="py-2 text-gray-400">${t.setup}</td>
+                    <td class="py-2 text-right font-mono ${pnlClass}">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</td>
+                `;
+                tableBody.appendChild(row);
+
+                cumPnL += t.pnl;
+                chartLabels.push(t.date);
+                chartData.push(cumPnL);
+
+                if (t.pnl > 0) { wins++; totalProfit += t.pnl; }
+                else { totalLoss += Math.abs(t.pnl); }
+
+                todayPnL += t.pnl;
+            });
+
+            // Update Metrics
+            document.getElementById('stat-pnl').innerText = `${todayPnL >= 0 ? '+' : ''}$${todayPnL.toFixed(2)}`;
+            document.getElementById('stat-pnl').className = `font-bold text-lg ${todayPnL >= 0 ? 'text-green-400' : 'text-red-400'}`;
+            
+            const winrate = trades.length > 0 ? ((wins / trades.length) * 100).toFixed(1) : 0;
+            document.getElementById('stat-winrate').innerText = `${winrate}%`;
+
+            const pf = totalLoss > 0 ? (totalProfit / totalLoss).toFixed(2) : totalProfit.toFixed(2);
+            document.getElementById('stat-pf').innerText = pf;
+
+            // Update Chart
+            chart.data.labels = chartLabels;
+            chart.data.datasets[0].data = chartData;
+            chart.update();
+        }
+
+        window.onload = () => {
+            initChart();
+            calculateRisk();
+        };
+    </script>
+</body>
+</html>
